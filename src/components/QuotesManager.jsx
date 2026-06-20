@@ -2,25 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { printLandSolarDocument } from './pdfGenerator.js';
 
 export default function QuotesManager({ products = [], apiUrl }) {
-  // الحالات الخاصة بإدارة عروض الأسعار والأرشيف
   const [quotes, setQuotes] = useState([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  
-  // المصفوفة الديناميكية لأسطر الجدول
   const [currentItems, setCurrentItems] = useState([
     { rowId: Date.now(), productId: '', customPrice: '', quantity: 1 }
   ]);
-
-  // الحالات الخاصة بخانات الاختيار والملاحظات أسفل الجدول
   const [includeWarranty, setIncludeWarranty] = useState(false);
   const [includeNote, setIncludeNote] = useState(false);
   const [customNoteText, setCustomNoteText] = useState('');
-
-  // حالة وضع التعديل
   const [editingQuoteId, setEditingQuoteId] = useState(null);
 
-  // جلب عروض الأسعار من السيرفر
   const fetchQuotes = async () => {
     try {
       const response = await fetch(`${apiUrl}/quotes`);
@@ -35,14 +27,13 @@ export default function QuotesManager({ products = [], apiUrl }) {
     fetchQuotes();
   }, []);
 
-  // مراقبة وتحديث بيانات الصنف عند تغيير خيار المنتج في سطر معين
   const handleRowProductChange = (rowId, productId) => {
     const updatedItems = currentItems.map(item => {
       if (item.rowId === rowId) {
         if (!productId) {
           return { ...item, productId: '', customPrice: '' };
         }
-        const prod = products.find(p => (p.id || p._id)?.toString() === productId.toString());
+        const prod = products.find(p => p.id?.toString() === productId.toString());
         return { 
           ...item, 
           productId: productId, 
@@ -54,7 +45,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     setCurrentItems(updatedItems);
   };
 
-  // تحديث السعر المخصص لسطر معين
   const handleRowPriceChange = (rowId, priceValue) => {
     const updatedItems = currentItems.map(item => {
       if (item.rowId === rowId) {
@@ -65,7 +55,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     setCurrentItems(updatedItems);
   };
 
-  // تحديث الكمية لسطر معين
   const handleRowQuantityChange = (rowId, qtyValue) => {
     const updatedItems = currentItems.map(item => {
       if (item.rowId === rowId) {
@@ -76,7 +65,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     setCurrentItems(updatedItems);
   };
 
-  // إضافة سطر صنف جديد فارغ
   const handleAddNewRow = () => {
     setCurrentItems([
       ...currentItems,
@@ -84,7 +72,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     ]);
   };
 
-  // حذف سطر صنف معين
   const handleRemoveRow = (rowId) => {
     if (currentItems.length === 1) {
       setCurrentItems([{ rowId: Date.now(), productId: '', customPrice: '', quantity: 1 }]);
@@ -93,7 +80,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     setCurrentItems(currentItems.filter(item => item.rowId !== rowId));
   };
 
-  // حساب الإجمالي الكلي الحالي للواجهة
   const calculateGrandTotal = () => {
     return currentItems.reduce((acc, item) => {
       const price = parseFloat(item.customPrice) || 0;
@@ -102,21 +88,19 @@ export default function QuotesManager({ products = [], apiUrl }) {
     }, 0);
   };
 
-  // معالجة الضغط على زر "تعديل" من الأرشيف
   const handleEditQuoteClick = (quote) => {
     const targetId = quote.id || quote._id;
     setEditingQuoteId(targetId);
-    setCustomerName(quote.customerName);
-    setCustomerPhone(quote.customerPhone);
-    
-    setIncludeWarranty(quote.hasWarranty || false);
-    setIncludeNote(!!quote.note);
+    setCustomerName(quote.customer_name || quote.customerName);
+    setCustomerPhone(quote.customer_phone || quote.customerPhone);
+    setIncludeWarranty(quote.has_warranty || quote.hasWarranty || false);
+    setIncludeNote(!!(quote.note));
     setCustomNoteText(quote.note || '');
 
     if (quote.items && quote.items.length > 0) {
       const formattedItems = quote.items.map((item, index) => {
         const foundProd = products.find(p => p.name === item.name);
-        const prodId = foundProd ? (foundProd.id || foundProd._id) : '';
+        const prodId = foundProd ? foundProd.id : '';
         return {
           rowId: Date.now() + index,
           productId: prodId ? prodId.toString() : '',
@@ -132,7 +116,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // إلغاء وضع التعديل وتصفير الحقول
   const handleCancelEdit = () => {
     setEditingQuoteId(null);
     setCustomerName('');
@@ -143,7 +126,6 @@ export default function QuotesManager({ products = [], apiUrl }) {
     setCurrentItems([{ rowId: Date.now(), productId: '', customPrice: '', quantity: 1 }]);
   };
 
-  // دالة الإرسال والحفظ
   const handleSubmitQuote = async (e) => {
     e.preventDefault();
 
@@ -152,17 +134,17 @@ export default function QuotesManager({ products = [], apiUrl }) {
       return;
     }
 
-    // بناء مصفوفة العناصر لتطابق مسميات جدول الـ PDF تماماً
     const finalItems = currentItems
       .map(item => {
         if (!item.productId) return null;
-        const prod = products.find(p => (p.id || p._id)?.toString() === item.productId.toString());
+        const prod = products.find(p => p.id?.toString() === item.productId.toString());
         if (!prod) return null;
         
         const price = item.customPrice !== "" ? parseFloat(item.customPrice) : prod.price;
         const qty = parseInt(item.quantity) || 1;
         
         return {
+          id: prod.id,
           name: prod.name,
           price: price,
           unit: prod.unit || "حبة",
@@ -179,17 +161,41 @@ export default function QuotesManager({ products = [], apiUrl }) {
 
     const grandTotal = finalItems.reduce((sum, item) => sum + item.total, 0);
 
-    // بناء كائن البيانات الكامل الموجه والمتوافق كلياً مع دالة البناء للـ PDF
     const quotePayload = {
-      id: editingQuoteId || Date.now(),
-      customerName,
-      customerPhone,
-      items: finalItems,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim() || "غير مسجل",
       grandTotal: grandTotal,
       hasWarranty: includeWarranty,
       note: includeNote ? customNoteText : '',
-      createdAt: new Date().toISOString()
+      // 🔥 إرسال الأصناف بصيغة المنتجات (product_id)
+      items: finalItems.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.total
+      }))
     };
+
+  // في QuotesManager.jsx - داخل handleSubmitQuote
+
+// 🔥 تأكد من أن printPayload يحتوي على customer_name و grand_total
+const printPayload = {
+  customer_name: customerName.trim(),  // snake_case للتوافق مع PostgreSQL
+  customer_phone: customerPhone.trim() || "غير مسجل",
+  grand_total: grandTotal,
+  items: finalItems.map(item => ({
+    name: item.name,
+    price: item.price,
+    unit: item.unit,
+    quantity: item.quantity,
+    total: item.total
+  })),
+  has_warranty: includeWarranty,
+  note: includeNote ? customNoteText : '',
+  createdAt: new Date().toISOString()
+};
+
+// عند الطباعة
 
     try {
       let response;
@@ -208,20 +214,18 @@ export default function QuotesManager({ products = [], apiUrl }) {
       }
 
       if (response.ok) {
-        // الحل الجذري: نمرر الكائن الكامل المبني محلياً لضمان عدم تأثر الطباعة بنوع استجابة السيرفر
-        printLandSolarDocument(quotePayload, 'offer');
-        
+        printLandSolarDocument(printPayload, 'offer');
         handleCancelEdit();
         fetchQuotes();
       } else {
-        alert(`فشلت عملية الحفظ. كود الخطأ من الخادم: ${response.status}`);
+        const error = await response.json();
+        alert(`فشلت عملية الحفظ. ${error.error || ''}`);
       }
     } catch (error) {
       console.error("خطأ أثناء حفظ عرض السعر:", error);
     }
   };
 
-  // دالة الحذف
   const handleDeleteQuote = async (id, name) => {
     if (!window.confirm(`هل أنت متأكد من حذف عرض السعر الخاص بالعميل (${name})؟`)) {
       return;
@@ -242,6 +246,7 @@ export default function QuotesManager({ products = [], apiUrl }) {
       console.error("خطأ أثناء حذف عرض السعر:", error);
     }
   };
+
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-6" dir="rtl">
       
@@ -288,93 +293,163 @@ export default function QuotesManager({ products = [], apiUrl }) {
           </div>
 
           {/* جدول أسطر المنتجات */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">📦</span>
-              <h3 className="text-sm font-black text-slate-700">أصناف ومواد منظومة العرض</h3>
-            </div>
-            
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="w-full border-collapse text-right text-sm">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
-                    <th className="p-3 w-12 text-center">#</th>
-                    <th className="p-3 min-w-[240px]">اسم الصنف / المنتج</th>
-                    <th className="p-3 w-36 text-center">سعر الوحدة ($)</th>
-                    <th className="p-3 w-24 text-center">الكمية</th>
-                    <th className="p-3 w-32 text-center">الإجمالي ($)</th>
-                    <th className="p-3 w-16 text-center">إجراء</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentItems.map((item, index) => {
-                    const currentTotal = (parseFloat(item.customPrice) || 0) * (parseInt(item.quantity) || 0);
-                    
-                    return (
-                      <tr key={item.rowId} className="hover:bg-slate-50/70 transition-all">
-                        <td className="p-3 text-center text-slate-400 font-bold">{index + 1}</td>
-                        <td className="p-3">
-                          <select
-                            value={item.productId}
-                            onChange={(e) => handleRowProductChange(item.rowId, e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
-                          >
-                            <option value="">-- اختر صنف من المخزن --</option>
-                            {products.map(p => {
-                              const pId = p.id || p._id;
-                              return (
-                                <option key={pId} value={pId}>{p.name} (${p.price})</option>
-                              );
-                            })}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            step="any"
-                            value={item.customPrice}
-                            onChange={(e) => handleRowPriceChange(item.rowId, e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
-                          />
-                        </td>
-                        <td className="p-3">
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.quantity}
-                            onChange={(e) => handleRowQuantityChange(item.rowId, e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
-                          />
-                        </td>
-                        <td className="p-3 text-center font-extrabold text-slate-700">
-                          ${currentTotal.toLocaleString()}
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRow(item.rowId)}
-                            className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-all"
-                            title="حذف هذا السطر"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {/* جدول أسطر المنتجات - تصميم متجاوب */}
+<div className="overflow-x-auto border border-slate-200 rounded-xl">
+  {/* نسخة سطح المكتب (شاشات كبيرة) */}
+  <div className="hidden md:block">
+    <table className="w-full border-collapse text-right text-sm">
+      <thead>
+        <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold">
+          <th className="p-3 w-12 text-center">#</th>
+          <th className="p-3 min-w-[240px]">اسم الصنف / المنتج</th>
+          <th className="p-3 w-36 text-center">سعر الوحدة ($)</th>
+          <th className="p-3 w-24 text-center">الكمية</th>
+          <th className="p-3 w-32 text-center">الإجمالي ($)</th>
+          <th className="p-3 w-16 text-center">إجراء</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {currentItems.map((item, index) => {
+          const currentTotal = (parseFloat(item.customPrice) || 0) * (parseInt(item.quantity) || 0);
+          
+          return (
+            <tr key={item.rowId} className="hover:bg-slate-50/70 transition-all">
+              <td className="p-3 text-center text-slate-400 font-bold">{index + 1}</td>
+              <td className="p-3">
+                <select
+                  value={item.productId}
+                  onChange={(e) => handleRowProductChange(item.rowId, e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">-- اختر صنف --</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} (${p.price})</option>
+                  ))}
+                </select>
+              </td>
+              <td className="p-3">
+                <input
+                  type="number"
+                  step="any"
+                  value={item.customPrice}
+                  onChange={(e) => handleRowPriceChange(item.rowId, e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </td>
+              <td className="p-3">
+                <input
+                  type="number"
+                  min="0"
+                  value={item.quantity}
+                  onChange={(e) => handleRowQuantityChange(item.rowId, e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </td>
+              <td className="p-3 text-center font-extrabold text-slate-700">
+                ${currentTotal.toLocaleString()}
+              </td>
+              <td className="p-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveRow(item.rowId)}
+                  className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-all"
+                  title="حذف هذا السطر"
+                >
+                  🗑️
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+
+  {/* نسخة الجوال (شاشات صغيرة) */}
+  <div className="md:hidden divide-y divide-slate-100">
+    {currentItems.length === 0 ? (
+      <div className="p-6 text-center text-slate-400 text-xs font-medium">
+        لا توجد أصناف مضافة حتى الآن
+      </div>
+    ) : (
+      currentItems.map((item, index) => {
+        const currentTotal = (parseFloat(item.customPrice) || 0) * (parseInt(item.quantity) || 0);
+        const selectedProduct = products.find(p => p.id?.toString() === item.productId?.toString());
+        
+        return (
+          <div key={item.rowId} className="p-3 hover:bg-slate-50/70 transition-all space-y-2">
+            {/* رقم السطر */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400"># {index + 1}</span>
+              <button
+                type="button"
+                onClick={() => handleRemoveRow(item.rowId)}
+                className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg text-xs font-bold transition-all"
+              >
+                حذف
+              </button>
             </div>
 
-            <button
+            {/* اختيار الصنف */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">اسم الصنف</label>
+              <select
+                value={item.productId}
+                onChange={(e) => handleRowProductChange(item.rowId, e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">-- اختر صنف --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* السعر والكمية */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">سعر الوحدة ($)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={item.customPrice}
+                  onChange={(e) => handleRowPriceChange(item.rowId, e.target.value)}
+                  placeholder="0.00"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">الكمية</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={item.quantity}
+                  onChange={(e) => handleRowQuantityChange(item.rowId, e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* الإجمالي */}
+            <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+              <span className="text-sm font-bold text-slate-600">الإجمالي:</span>
+              <span className="text-sm font-extrabold text-emerald-600">${currentTotal.toLocaleString()}</span>
+            </div>
+        
+          </div>
+        );
+      })
+    )}
+  </div>
+  <button
               type="button"
               onClick={handleAddNewRow}
               className="mt-4 w-full py-3 border-2 border-dashed border-emerald-300 rounded-xl text-emerald-700 bg-emerald-50/30 hover:bg-emerald-50 font-black text-xs transition-all flex items-center justify-center gap-1.5"
             >
               ➕ إضافة صنف آخر للعرض
             </button>
-          </div>
+</div>
 
           {/* خانات الاختيار (Checkboxes) والملاحظات */}
           <div className="bg-slate-50/70 rounded-xl p-4 border border-slate-200/60 space-y-4">
@@ -474,18 +549,18 @@ export default function QuotesManager({ products = [], apiUrl }) {
                   const currentQuoteId = q.id || q._id;
                   return (
                     <tr key={currentQuoteId} className="hover:bg-slate-50/50 transition-all">
-                      <td className="p-3.5 font-bold text-slate-800">{q.customerName}</td>
-                      <td className="p-3.5 text-slate-600 font-medium">{q.customerPhone || '—'}</td>
+                      <td className="p-3.5 font-bold text-slate-800">{q.customer_name || q.customerName}</td>
+                      <td className="p-3.5 text-slate-600 font-medium">{q.customer_phone || q.customerPhone || '—'}</td>
                       <td className="p-3.5 text-xs font-semibold">
                         <div className="flex gap-1.5 flex-wrap">
-                          {q.hasWarranty && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">🛡️ ضمان</span>}
-                          {q.note && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100" title={q.note}>📝 ملاحظة</span>}
-                          {!q.hasWarranty && !q.note && <span className="text-slate-400">—</span>}
+                          {(q.has_warranty || q.hasWarranty) && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">🛡️ ضمان</span>}
+                             {q.note && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100" title={q.note}>📝 ملاحظة</span>}
+                          {!(q.has_warranty || q.hasWarranty) && !q.note && <span className="text-slate-400">—</span>}
                         </div>
                       </td>
-                      <td className="p-3.5 text-[#059669] font-black">${Number(q.grandTotal).toLocaleString()}</td>
+                      <td className="p-3.5 text-[#059669] font-black">${Number(q.grand_total || q.grandTotal).toLocaleString()}</td>
                       <td className="p-3.5 text-slate-400 text-xs font-medium">
-                        {q.createdAt ? new Date(q.createdAt).toLocaleDateString('ar-YE') : '—'}
+                        {q.created_at || q.createdAt ? new Date(q.created_at || q.createdAt).toLocaleDateString('ar-YE') : '—'}
                       </td>
                       <td className="p-3.5 text-center flex justify-center gap-2 items-center">
                         <button 
@@ -504,7 +579,7 @@ export default function QuotesManager({ products = [], apiUrl }) {
                         </button>
                         <button 
                           type="button"
-                          onClick={() => handleDeleteQuote(currentQuoteId, q.customerName)}
+                          onClick={() => handleDeleteQuote(currentQuoteId, q.customer_name || q.customerName)}
                           className="text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg text-xs font-bold transition-all"
                         >
                           حذف

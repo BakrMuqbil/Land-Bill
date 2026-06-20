@@ -6,14 +6,13 @@
 const getCurrentFormattedDate = () => {
   const date = new Date();
   const year = date.getFullYear();
-  // إضافة صفر على اليسار إذا كان الشهر أو اليوم أقل من 10
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}/${month}/${day}`;
 };
 
 /**
- * الستايل المعتمد لتهيئة الصورة كخلفية ممتدة على كامل الصفحة والتنسيقات الهيكلية
+ * الستايل المعتمد لتهيئة الصورة كخلفية ممتدة على كامل الصفحة
  */
 const getInvoiceStyle = () => `
   * {
@@ -24,7 +23,7 @@ const getInvoiceStyle = () => `
   
   @page {
     size: A4;
-    margin: 0; /* إلغاء هوامش الطابعة الافتراضية لضمان تمدد الخلفية بالكامل */
+    margin: 0;
   }
 
   body {
@@ -38,7 +37,6 @@ const getInvoiceStyle = () => `
     print-color-adjust: exact !important;
   }
   
-  /* حاوية الخلفية الكاملة للصورة المنقولة من مجلد public */
   .pdf-background-container {
     position: absolute;
     top: 0;
@@ -52,7 +50,6 @@ const getInvoiceStyle = () => `
     z-index: 1;
   }
 
-  /* طبقة المحتوى النصي والبيانات الفوقية */
   .main-content {
     position: absolute;
     top: 0;
@@ -60,15 +57,14 @@ const getInvoiceStyle = () => `
     width: 210mm;
     height: 297mm;
     z-index: 10;
-    padding-top: 42mm;     /* مساحة الهيدر العلوي لاند سولار */
-    padding-bottom: 35mm;  /* مساحة الفوتر السفلي */
+    padding-top: 47mm;
+    padding-bottom: 35mm;
     padding-left: 18mm;
     padding-right: 18mm;
     display: flex;
     flex-direction: column;
   }
 
-  /* عنوان المستند: عرض سعر / فاتورة مبيعات */
   .document-title {
     text-align: center;
     margin-bottom: 20px;
@@ -84,7 +80,6 @@ const getInvoiceStyle = () => `
     display: inline-block;
   }
 
-  /* سطر معلومات العميل والجوال والتاريخ المتباعد */
   .customer-info-line {
     display: flex;
     justify-content: space-between;
@@ -95,7 +90,6 @@ const getInvoiceStyle = () => `
     padding: 0 5px;
   }
 
-  /* فقرة التحية المكتوبة بالصورة */
   .greeting-paragraph {
     font-size: 13px;
     color: #000000;
@@ -104,7 +98,6 @@ const getInvoiceStyle = () => `
     margin-bottom: 15px;
   }
 
-  /* جدول تفاصيل العمل والأصناف */
   table {
     width: 100%;
     border-collapse: collapse;
@@ -113,15 +106,14 @@ const getInvoiceStyle = () => `
   }
   th, td {
     border: 1px solid #000000;
-    padding: 8px 6px;
+    padding: 6px 6px;
     color: #000000;
   }
   
-  /* تعديل النصوص الرئيسية الثابتة في الصف الأول لتصبح عريضة وواضحة جداً */
   th {
     background-color: rgba(242, 242, 242, 0.5); 
     font-size: 14px;
-    font-weight: 900 !important; /* تجعل الخط Bold عريض جداً */
+    font-weight: 900 !important;
     text-align: center;
   }
   
@@ -135,7 +127,6 @@ const getInvoiceStyle = () => `
     font-weight: bold;
   }
 
-  /* تنسيق قسم الملاحظات والضمان المضاف ليتناسب مع تصميمك الأسود والأبيض الكلاسيكي */
   .custom-notes-area {
     margin-top: 15px;
     border-right: 3px solid #000000;
@@ -160,6 +151,26 @@ const getInvoiceStyle = () => `
     font-style: italic;
   }
 
+  /* 🔥 ستايل الختم - النص في اليسار والصورة تحته */
+.stamp-container {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.stamp-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #000000;
+  padding-left: 25px;
+}
+.stamp-image {
+  max-height: 110px;
+  width: auto;
+  object-fit: contain;
+}¬
+
   @media print {
     body, .pdf-background-container, .main-content {
       width: 210mm;
@@ -169,39 +180,57 @@ const getInvoiceStyle = () => `
 `;
 
 /**
- * الدالة الموحدة لإنشاء المستند وطباعته بـ عدد أصناف فعلي وتاريخ تلقائي
+ * الدالة الموحدة لإنشاء المستند وطباعته
  */
 export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   const isOffer = mode === 'offer';
   
-  const customerName = data.customerName || data.name || "............................................";
-  const customerPhone = data.customerPhone || data.phone || "........................";
+  // دعم camelCase و snake_case
+  const customerName = data.customerName || data.customer_name || "............................................";
+  const customerPhone = data.customerPhone || data.customer_phone || "........................";
   const items = data.items || [];
-  const grandTotal = data.grandTotal || data.totalPrice || 0;
+  const grandTotal = data.grandTotal || data.grand_total || 0;
   
-  // استخراج الملاحظات والضمان بمرونة للمسميات (القديمة في JSON والجديدة في الواجهة)
   const customNote = data.note || data.notes || '';
-  const hasWarranty = data.hasWarranty || data.warranty || false;
+  const hasWarranty = data.hasWarranty || data.has_warranty || false;
+  
+  // 🔥 دعم الختم
+  const includeStamp = data.includeStamp || data.include_stamp || false;
 
-  // توليد التاريخ التلقائي الحالي للمستند
   const documentDate = getCurrentFormattedDate();
 
-  // بناء شبكة أسطر الجدول بناءً على عدد الأصناف الفعلي فقط
+  // بناء شبكة أسطر الجدول
   let tableRows = '';
-  items.forEach((item, idx) => {
-    tableRows += `
+  if (items && items.length > 0) {
+    items.forEach((item, idx) => {
+      const itemName = item.name || item.product_name || '';
+      const itemUnit = item.unit || 'حبة';
+      const itemQuantity = item.quantity || 0;
+      const itemPrice = item.price || 0;
+      const itemTotal = item.total || (itemQuantity * itemPrice) || 0;
+      
+      tableRows += `
+        <tr>
+          <td class="text-center">${idx + 1}</td>
+          <td style="font-weight: bold;">${itemName}</td>
+          <td class="text-center">${itemUnit}</td>
+          <td class="text-center" style="font-weight: bold;">${itemQuantity}</td>
+          <td class="text-left" dir="ltr">${Number(itemPrice).toLocaleString()}</td>
+          <td class="text-left" dir="ltr" style="font-weight: bold;">${Number(itemTotal).toLocaleString()}</td>
+        </tr>
+      `;
+    });
+  } else {
+    tableRows = `
       <tr>
-        <td class="text-center">${idx + 1}</td>
-        <td style="font-weight: bold;">${item.name || item.description || ''}</td>
-        <td class="text-center">${item.unit || 'حبة'}</td>
-        <td class="text-center" style="font-weight: bold;">${item.quantity || 0}</td>
-        <td class="text-left" dir="ltr">${Number(item.price || 0).toLocaleString()}</td>
-        <td class="text-left" dir="ltr" style="font-weight: bold;">${Number(item.total || (item.quantity * item.price) || 0).toLocaleString()}</td>
+        <td colspan="6" class="text-center" style="padding: 20px; color: #999;">
+          لا توجد أصناف في هذا المستند
+        </td>
       </tr>
     `;
-  });
+  }
 
-  // إدارة الـ iframe المخفي والتأكد من تصفير الكاش القديم
+  // إدارة الـ iframe المخفي
   let printFrame = document.getElementById('land-solar-print-frame');
   if (printFrame) {
     printFrame.remove();
@@ -220,6 +249,9 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
 
   const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
   
+  const amountPaid = data.amountPaid || data.amount_paid;
+  const amountRemaining = data.amountRemaining || data.amount_remaining;
+
   frameDoc.open();
   frameDoc.write(`
     <!DOCTYPE html>
@@ -274,14 +306,14 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
               <td colspan="5" style="text-align: center; font-weight: 900;">الإجمالي الكلي ( دولار )</td>
               <td class="text-left" dir="ltr" style="font-weight: 900;">$${Number(grandTotal).toLocaleString()}</td>
             </tr>
-            ${!isOffer && data.amountPaid !== undefined ? `
+            ${!isOffer && amountPaid !== undefined ? `
               <tr class="total-row">
                 <td colspan="5" style="text-align: center;">المبلغ الواصل / المدفوع</td>
-                <td class="text-left" dir="ltr">$${Number(data.amountPaid).toLocaleString()}</td>
+                <td class="text-left" dir="ltr">$${Number(amountPaid).toLocaleString()}</td>
               </tr>
               <tr class="total-row">
                 <td colspan="5" style="text-align: center;">المبلغ المتبقي / الآجل</td>
-                <td class="text-left" dir="ltr">$${Number(data.amountRemaining || 0).toLocaleString()}</td>
+                <td class="text-left" dir="ltr">$${Number(amountRemaining || 0).toLocaleString()}</td>
               </tr>
             ` : ''}
           </tbody>
@@ -290,15 +322,19 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
         ${(customNote || hasWarranty) ? `
           <div class="custom-notes-area">
             <div class="notes-heading">📌 شروط وملاحظات منظومة لاند سولار:</div>
-            
-            ${customNote ? `
-              <div class="note-text">${customNote}</div>
-            ` : ''}
-            
-            ${hasWarranty ? `
-              <div class="warranty-text">🛡️ هذا العرض يشمل بند الضمانة المعتمدة للألواح والإنفرتر والبطاريات ضد العيوب المصنعية وفق السياسة الرسمية للشركة.</div>
-            ` : ''}
+            ${customNote ? `<div class="note-text">${customNote}</div>` : ''}
+            ${hasWarranty ? `<div class="warranty-text">🛡️ هذا العرض يشمل بند الضمانة المعتمدة للألواح والإنفرتر والبطاريات ضد العيوب المصنعية وفق السياسة الرسمية للشركة.</div>` : ''}
           </div>
+        ` : ''}
+
+        ${!isOffer && includeStamp ? `
+          <div class="stamp-container" dir="ltr">
+  <div class="stamp-label">ختم الشركة</div>
+  <div>
+    <img src="/Companyseal.png" class="stamp-image" alt="ختم الشركة" />
+  </div>
+</div>
+
         ` : ''}
 
       </div>
@@ -307,7 +343,6 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   `);
   frameDoc.close();
 
-  // تنفيذ الطباعة المباشرة والمستقرة للـ iframe
   const executePrint = () => {
     setTimeout(() => {
       try {

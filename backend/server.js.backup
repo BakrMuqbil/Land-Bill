@@ -26,31 +26,36 @@ const writeData = (data) => {
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 };
 
-// ============================================
-// مسارات الأصناف Products
-// ============================================
+// --- [ مسارات الأصناف Products ] ---
 app.get('/api/products', (req, res) => {
     res.json(readData().products);
 });
 
 app.post('/api/products', (req, res) => {
     const data = readData();
+    
+    // استخراج الخصائص الأساسية فقط من الـ body لمنع الـ id من القدوم كـ null
     const { name, price, unit } = req.body;
+    
     const newProduct = { 
-        id: Date.now(),
+        id: Date.now(), // توليد رقم فريد فوري ونظيف
         name: name,
         price: Number(price),
         unit: unit || 'حبة'
     };
+    
     data.products.push(newProduct);
     writeData(data);
     res.json({ success: true, product: newProduct });
 });
 
+
 app.put('/api/products/:id', (req, res) => {
     const data = readData();
     const id = parseInt(req.params.id);
-    data.products = data.products.map(p => p.id === id ? { ...p, ...req.body, id: p.id } : p);
+    data.products = data.products.map(p => 
+        p.id === id ? { ...p, ...req.body, id: p.id } : p
+    );
     writeData(data);
     res.json({ success: true });
 });
@@ -63,9 +68,7 @@ app.delete('/api/products/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// ============================================
-// مسارات عروض الأسعار Quotes
-// ============================================
+// --- [ مسارات عروض الأسعار Quotes ] ---
 app.get('/api/quotes', (req, res) => {
     res.json(readData().quotes);
 });
@@ -78,17 +81,20 @@ app.post('/api/quotes', (req, res) => {
     res.json({ success: true, quote: newQuote });
 });
 
+// مسار التعديل لعروض الأسعار
 app.put('/api/quotes/:id', (req, res) => {
     const data = readData();
     const id = parseInt(req.params.id);
+    
     let updatedQuote = null;
     data.quotes = data.quotes.map(q => {
         if (q.id === id) {
-            updatedQuote = { ...q, ...req.body, id: q.id };
+            updatedQuote = { ...q, ...req.body, id: q.id }; // الحفاظ على المعرف الرقمي ثابت
             return updatedQuote;
         }
         return q;
     });
+    
     writeData(data);
     res.json({ success: true, quote: updatedQuote });
 });
@@ -101,9 +107,7 @@ app.delete('/api/quotes/:id', (req, res) => {
     res.json({ success: true });
 });
 
-// ============================================
-// مسارات الفواتير Invoices
-// ============================================
+// --- [ مسارات الفواتير Invoices ] ---
 app.get('/api/invoices', (req, res) => {
     res.json(readData().invoices);
 });
@@ -114,24 +118,6 @@ app.post('/api/invoices', (req, res) => {
     data.invoices.push(newInvoice);
     writeData(data);
     res.json({ success: true, invoice: newInvoice });
-});
-
-// 🔥 مسار تعديل الفاتورة (PUT)
-app.put('/api/invoices/:id', (req, res) => {
-    const data = readData();
-    const id = parseInt(req.params.id);
-    
-    let updatedInvoice = null;
-    data.invoices = data.invoices.map(inv => {
-        if (inv.id === id) {
-            updatedInvoice = { ...inv, ...req.body, id: inv.id };
-            return updatedInvoice;
-        }
-        return inv;
-    });
-    
-    writeData(data);
-    res.json({ success: true, invoice: updatedInvoice });
 });
 
 app.delete('/api/invoices/:id', (req, res) => {
@@ -145,10 +131,10 @@ app.delete('/api/invoices/:id', (req, res) => {
 // تصدير التطبيق لـ Vercel
 module.exports = app;
 
-// تشغيل السيرفر محلياً فقط
+// تشغيل السيرفر محلياً فقط (تم إزالة التكرار)
 if (require.main === module) {
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-        console.log(`🚀 Server is running on http://localhost:${PORT}`);
-    });
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
 }

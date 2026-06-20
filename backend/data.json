@@ -338,8 +338,8 @@
     },
     {
       "id": 1781213895970,
-      "createdAt": "2026-06-13T14:16:00.221Z",
-      "customerName": "علي فهمي الصاصي",
+      "createdAt": "2026-06-16T21:43:30.166Z",
+      "customerName": "علي الصاصي",
       "customerPhone": "778021109",
       "items": [
         {
@@ -418,5 +418,90 @@
       "note": "*الاسلاك على حسب الطلب غير مدرج السعر في عرض السعر  \n*ضمانة البطاريه 5 سنوات \n*ضمانة الجهاز سنه "
     }
   ],
-  "invoices": []
+  "invoices": [
+    {
+      "id": 1781916455879,
+      "createdAt": "2026-06-20T02:00:32.662Z",
+      "customerName": "بكر احمد",
+      "customerPhone": "7777",
+      "grandTotal": 1010,
+      "amountPaid": 0,
+      "amountRemaining": 1010,
+      "status": "غير مدفوعة",
+      "includeStamp": false,
+      "note": "",
+      "items": [
+        {
+          "id": 13,
+          "name": "الواح ايكو 770 وات تقنية ABC كفاءة 24.6%",
+          "price": 150,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 150
+        },
+        {
+          "id": 28,
+          "name": "لوح AIKO 645W",
+          "price": 110,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 110
+        },
+        {
+          "id": 5,
+          "name": "بطارية ساكو 5 كيلو",
+          "price": 750,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 750
+        }
+      ]
+    },
+    {
+      "id": 1781920981666,
+      "createdAt": "2026-06-20T02:05:39.155Z",
+      "customerName": "صالح احمد",
+      "customerPhone": "77777",
+      "grandTotal": 2408,
+      "amountPaid": 2400,
+      "amountRemaining": 8,
+      "status": "مدفوعة جزئياً (آجل)",
+      "includeStamp": true,
+      "note": "#_ضمانة الجهاز سنه \n#_ضمانة البطاريه 5 سنوات ",
+      "items": [
+        {
+          "id": 14,
+          "name": "الواح 625 وات نوعية tw",
+          "price": 105,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 105
+        },
+        {
+          "id": 26,
+          "name": "جهاز جروات 12KW (V48)",
+          "price": 850,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 850
+        },
+        {
+          "id": 7,
+          "name": "بطارية ساكو 10 كيلو شاشة لمس نظام إطفاء حرائق 6000 دورة",
+          "price": 1450,
+          "unit": "حبة",
+          "quantity": 1,
+          "total": 1450
+        },
+        {
+          "id": 16,
+          "name": "سلك 6 ملي توين DC",
+          "price": 3,
+          "unit": "متر",
+          "quantity": 1,
+          "total": 3
+        }
+      ]
+    }
+  ]
 }
