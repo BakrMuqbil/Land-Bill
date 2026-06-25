@@ -10,6 +10,7 @@ const productModel = {
   // إضافة صنف جديد
   create: async (product) => {
     const { name, price, unit } = product;
+    // 🔥 لا ترسل id، سيتم توليده تلقائياً
     const result = await pool.query(
       'INSERT INTO products (name, price, unit) VALUES ($1, $2, $3) RETURNING *',
       [name, price, unit || 'حبة']

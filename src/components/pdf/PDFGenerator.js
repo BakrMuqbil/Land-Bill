@@ -65,11 +65,33 @@ const getInvoiceStyle = () => `
     flex-direction: column;
   }
 
-  .document-title {
-    text-align: center;
+  /* 🔥 هيدر: رقم في اليسار، عنوان في المنتصف (RTL) */
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
+    padding: 0 5px;
+    direction: rtl;
   }
-  .document-title span {
+  .header-left {
+    flex: 0 0 auto;
+    text-align: right;
+    font-size: 14px;
+  }
+  .header-left .doc-label {
+    font-weight: 500;
+    color: #000000;
+  }
+  .header-left .doc-number {
+    font-weight: bold;
+    color: #cc0000;
+  }
+  .header-center {
+    flex: 1;
+    text-align: center;
+  }
+  .header-center span {
     font-size: 18px;
     font-weight: bold;
     color: #000000;
@@ -78,6 +100,10 @@ const getInvoiceStyle = () => `
     padding-left: 25px;
     padding-right: 25px;
     display: inline-block;
+  }
+  .header-right {
+    flex: 0 0 auto;
+    width: 120px;
   }
 
   .customer-info-line {
@@ -151,25 +177,23 @@ const getInvoiceStyle = () => `
     font-style: italic;
   }
 
-  /* 🔥 ستايل الختم - النص في اليسار والصورة تحته */
-.stamp-container {
-  margin-top: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-.stamp-label {
-  font-size: 12px;
-  font-weight: bold;
-  color: #000000;
-  padding-left: 25px;
-}
-.stamp-image {
-  max-height: 110px;
-  width: auto;
-  object-fit: contain;
-}¬
+  .stamp-container {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .stamp-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #000000;
+  }
+  .stamp-image {
+    max-height: 110px;
+    width: auto;
+    object-fit: contain;
+  }
 
   @media print {
     body, .pdf-background-container, .main-content {
@@ -189,13 +213,13 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   const customerName = data.customerName || data.customer_name || "............................................";
   const customerPhone = data.customerPhone || data.customer_phone || "........................";
   const items = data.items || [];
-  const grandTotal = data.grandTotal || data.grand_total || 0;
   
   const customNote = data.note || data.notes || '';
   const hasWarranty = data.hasWarranty || data.has_warranty || false;
-  
-  // 🔥 دعم الختم
   const includeStamp = data.includeStamp || data.include_stamp || false;
+
+  // 🔥 رقم المستند (فاتورة أو عرض سعر)
+  const documentNumber = data.invoice_number || data.quote_number || data.documentNumber || '';
 
   const documentDate = getCurrentFormattedDate();
 
@@ -249,8 +273,17 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
 
   const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
   
-  const amountPaid = data.amountPaid || data.amount_paid;
-  const amountRemaining = data.amountRemaining || data.amount_remaining;
+  const grandTotal =
+  data.grandTotal ?? data.grand_total ?? 0;
+
+const amountPaid =
+  data.amountPaid ?? data.amount_paid ?? 0;
+
+const amountRemaining =
+  data.amountRemaining ?? data.amount_remaining ?? 0;
+
+  // 🔥 تحديد النص المعروض حسب نوع المستند
+  const docLabel = isOffer ? 'رقم العرض' : 'رقم الفاتورة';
 
   frameDoc.open();
   frameDoc.write(`
@@ -266,10 +299,18 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
       
       <div class="main-content">
         
-        <div class="document-title">
-          <span>${isOffer ? 'عرض سعر' : 'فاتورة مبيعات'}</span>
+        <!-- 🔥 هيدر: رقم في اليسار، عنوان في المنتصف -->
+        <div class="header-section" >
+          <div class="header-left" >
+            ${documentNumber ? `<span class="doc-label">${docLabel}: </span><span class="doc-number">${documentNumber}</span>` : ''}
+          </div>
+          <div class="header-center">
+            <span>${isOffer ? 'عرض سعر' : 'فاتورة مبيعات'}</span>
+          </div>
+          <div class="header-right"></div>
         </div>
 
+        <!-- معلومات العميل -->
         <div class="customer-info-line">
           <div>
             <span>الاخ/ عميل:</span>
@@ -306,7 +347,7 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
               <td colspan="5" style="text-align: center; font-weight: 900;">الإجمالي الكلي ( دولار )</td>
               <td class="text-left" dir="ltr" style="font-weight: 900;">$${Number(grandTotal).toLocaleString()}</td>
             </tr>
-            ${!isOffer && amountPaid !== undefined ? `
+            ${!isOffer ? `
               <tr class="total-row">
                 <td colspan="5" style="text-align: center;">المبلغ الواصل / المدفوع</td>
                 <td class="text-left" dir="ltr">$${Number(amountPaid).toLocaleString()}</td>
@@ -328,13 +369,12 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
         ` : ''}
 
         ${!isOffer && includeStamp ? `
-          <div class="stamp-container" dir="ltr">
-  <div class="stamp-label">ختم الشركة</div>
-  <div>
-    <img src="/Companyseal.png" class="stamp-image" alt="ختم الشركة" />
-  </div>
-</div>
-
+          <div class="stamp-container">
+            <div class="stamp-label">ختم الشركة</div>
+            <div>
+              <img src="/Companyseal.png" class="stamp-image" alt="ختم الشركة" />
+            </div>
+          </div>
         ` : ''}
 
       </div>

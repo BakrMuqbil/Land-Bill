@@ -1,15 +1,13 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// استخدام الرابط الكامل مباشرة
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // ضروري لـ Neon
+    rejectUnauthorized: false
   }
 });
 
-// اختبار الاتصال
 pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ خطأ في الاتصال بقاعدة البيانات:', err.message);

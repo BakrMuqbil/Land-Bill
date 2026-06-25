@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import Login from './pages/Login';
 import QuotesManager from './components/QuotesManager';
 import InvoicesManager from './components/InvoicesManager';
 import ProductsManager from './components/ProductsManager';
 
-
 const API_URL = 'http://localhost:5000/api';
 
-function App() {
+// ============================================
+// 🔥 مكون المحتوى الرئيسي (محمي)
+// ============================================
+function AppContent() {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('quotes');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +78,11 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-right font-sans flex flex-col justify-between" dir="rtl">
+    <div className="min-h-screen bg-slate-50 text-right font-sans flex flex-col" dir="rtl">
       
       {/* هيدر الموقع */}
-      <header className="bg-white border-b border-slate-200 py-4 px-4 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <header className="bg-white border-b border-slate-200 py-3 px-4 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
           
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="شعار لاند سولار" className="h-10 w-auto object-contain" />
@@ -85,28 +92,39 @@ function App() {
           <nav className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 w-full md:w-auto justify-around sm:justify-start gap-1">
             <button 
               onClick={() => setActiveTab('quotes')}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'quotes' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+              className={`px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'quotes' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
             >
               عروض الأسعار
             </button>
             <button 
               onClick={() => setActiveTab('invoices')}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'invoices' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+              className={`px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'invoices' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
             >
               الفواتير
             </button>
             <button 
               onClick={() => setActiveTab('products')}
-              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'products' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+              className={`px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${activeTab === 'products' ? 'bg-[#059669] text-white shadow-md shadow-emerald-600/10' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
             >
               إدارة الأصناف
             </button>
           </nav>
 
-          <div className="hidden lg:flex flex-col items-end">
-            <div className="text-[10px] font-bold text-[#00a896] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100/80 uppercase tracking-widest">
-              نظام إدارة المبيعات v2.0
+          {/* 🔥 قسم المستخدم */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-sm font-bold text-slate-800">{user?.full_name}</span>
+              <span className="text-[10px] text-slate-400">@{user?.username}</span>
             </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="hidden sm:inline">تسجيل خروج</span>
+            </button>
           </div>
 
         </div>
@@ -141,7 +159,7 @@ function App() {
       </main>
 
       {/* الفوتر */}
-      <footer className="mt-12 px-4 mb-10" dir="rtl">
+      <footer className="mt-12 px-4 mb-10">
         <p className="text-slate-400 text-[13px] text-center mt-6 leading-relaxed">
           © 2026 جميع الحقوق محفوظة لشركة لاند سولار للطاقة المتجددة <br />
           تصميم وتطوير {' '}
@@ -158,6 +176,29 @@ function App() {
       </footer>
 
     </div>
+  );
+}
+
+// ============================================
+// 🔥 المكون الرئيسي للتطبيق
+// ============================================
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* صفحة تسجيل الدخول (عامة) */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* جميع الصفحات الأخرى (محمية) */}
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <AppContent />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
