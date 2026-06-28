@@ -219,7 +219,7 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   const includeStamp = data.includeStamp || data.include_stamp || false;
 
   // 🔥 رقم المستند (فاتورة أو عرض سعر)
-  const documentNumber = data.invoice_number || data.quote_number || data.documentNumber || '';
+  const documentNumber = data.invoiceNumber || data.quoteNumber || data.documentNumber || '';
 
   const documentDate = getCurrentFormattedDate();
 

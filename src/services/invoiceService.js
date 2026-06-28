@@ -18,6 +18,9 @@ export class InvoiceService extends ApiClient {
   }
 
   async delete(id) {
-    return this.delete(`/invoices/${id}`);
+    // ⚠️ يجب استخدام super.delete() وليس this.delete()
+    // لأن this.delete() ينادي نفس الدالة الحالية بدل دالة الأب (ApiClient)
+    // مما يسبب استدعاءً متكررًا لا نهائيًا (Maximum call stack size exceeded)
+    return super.delete(`/invoices/${id}`);
   }
 }

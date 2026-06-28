@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { printLandSolarDocument } from "../pdf/PDFGenerator.js";
 import SearchBar from '../common/SearchBar.jsx';
 
@@ -27,7 +27,7 @@ export default function InvoiceArchive({
       // دعم camelCase و snake_case
       const customerName = (inv.customerName || inv.customer_name || '').toLowerCase();
       const customerPhone = (inv.customerPhone || inv.customer_phone || '').toLowerCase();
-      const invoiceNumber = (inv.invoice_number || '').toLowerCase();
+      const invoiceNumber = (inv.invoiceNumber || '').toLowerCase();
       const grandTotal = String(inv.grandTotal || inv.grand_total || '');
       const status = (inv.status || '').toLowerCase();
 
@@ -127,7 +127,7 @@ export default function InvoiceArchive({
                 const amountRemaining = inv.amountRemaining || inv.amount_remaining || 0;
                 const status = inv.status || 'غير مدفوعة';
                 const createdAt = inv.createdAt || inv.created_at;
-                const invoiceNumber = inv.invoice_number || '—';
+                const invoiceNumber = inv.invoiceNumber || '—';
                 const statusInfo = getInvoiceStatus(grandTotal, amountPaid);
 
                 return (

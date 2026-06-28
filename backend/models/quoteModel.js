@@ -27,102 +27,141 @@ const quoteModel = {
     return result.rows;
   },
 
-  create: async (quote) => {
-    console.log('📥 [quoteModel.create] البيانات المستلمة:', JSON.stringify(quote, null, 2));
+  // ✅ الأجزاء المصححة فقط
+
+create: async (quote) => {
+  // ✅ استخدام snake_case
+  const { customer_name, customer_phone, grand_total, has_warranty, note, items } = quote;
+  
+  if (!customer_name) {
+    throw new Error('اسم العميل مطلوب');
+  }
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
     
-    const { customerName, customerPhone, grandTotal, hasWarranty, note, items } = quote;
+    const quoteResult = await client.query(
+      `INSERT INTO quotes (customer_name, customer_phone, grand_total, has_warranty, note) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [customer_name, customer_phone || 'غير مسجل', grand_total || 0, has_warranty || false, note || '']
+    );
     
-    if (!customerName) {
-      throw new Error('اسم العميل مطلوب');
-    }
-    
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    const quoteId = quoteResult.rows[0].id;
+    const quoteNumber = quoteResult.rows[0].quote_number;
 
-      console.log('📝 [quoteModel.create] جاري إدراج العرض...');
-      
-      const quoteResult = await client.query(
-        `INSERT INTO quotes (customer_name, customer_phone, grand_total, has_warranty, note) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [customerName, customerPhone || 'غير مسجل', grandTotal || 0, hasWarranty || false, note || '']
-      );
-      
-      const quoteId = quoteResult.rows[0].id;
-      console.log('✅ [quoteModel.create] تم إدراج العرض برقم:', quoteId);
-
-      if (items && items.length > 0) {
-        for (const item of items) {
-          // 🔥 استخدام product_id أو id
-          const productId = item.product_id || item.id;
-          console.log(`📝 [quoteModel.create] إدراج عنصر: product_id=${productId}, quantity=${item.quantity}, price=${item.price}`);
-          
-          if (!productId) {
-            throw new Error('معرف المنتج مطلوب (product_id)');
-          }
-          
-          await client.query(
-            `INSERT INTO quote_items (quote_id, product_id, quantity, price, total) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [quoteId, productId, item.quantity, item.price, item.total]
-          );
-        }
-        console.log(`✅ [quoteModel.create] تم إدراج ${items.length} عنصر`);
-      }
-
-      await client.query('COMMIT');
-      console.log('✅ [quoteModel.create] تم حفظ العرض بنجاح');
-      return { id: quoteId, ...quote };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('❌ [quoteModel.create] خطأ:', error.message);
-      console.error('❌ [quoteModel.create] Stack:', error.stack);
-      throw error;
-    } finally {
-      client.release();
-    }
-  },
-
-  update: async (id, quote) => {
-    const { customerName, customerPhone, grandTotal, hasWarranty, note, items } = quote;
-    const client = await pool.connect();
-    
-    try {
-      await client.query('BEGIN');
-
-      await client.query(
-        `UPDATE quotes 
-         SET customer_name = $1, customer_phone = $2, grand_total = $3, 
-             has_warranty = $4, note = $5, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $6`,
-        [customerName, customerPhone, grandTotal, hasWarranty || false, note || '', id]
-      );
-
-      await client.query('DELETE FROM quote_items WHERE quote_id = $1', [id]);
-
+    if (items && items.length > 0) {
       for (const item of items) {
         const productId = item.product_id || item.id;
+        if (!productId) {
+          throw new Error('معرف المنتج مطلوب (product_id)');
+        }
         await client.query(
           `INSERT INTO quote_items (quote_id, product_id, quantity, price, total) 
            VALUES ($1, $2, $3, $4, $5)`,
-          [id, productId, item.quantity, item.price, item.total]
+          [quoteId, productId, item.quantity, item.price, item.total]
         );
       }
-
-      await client.query('COMMIT');
-      return { id, ...quote };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
     }
-  },
+
+    await client.query('COMMIT');
+    return {
+      ...quote,
+      id: quoteId,
+      quote_number: quoteNumber
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+},
+
+update: async (id, quote) => {
+  // ✅ استخدام snake_case
+  const { customer_name, customer_phone, grand_total, has_warranty, note, items } = quote;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const checkResult = await client.query(
+      'SELECT status FROM quotes WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rowCount === 0) {
+      throw new Error('عرض السعر غير موجود');
+    }
+
+    if (checkResult.rows[0].status === 'approved') {
+      throw new Error('لا يمكن تعديل عرض سعر معتمد. قم بإلغاء التعميد أولاً.');
+    }
+
+    await client.query(
+      `UPDATE quotes
+       SET customer_name = $1,
+           customer_phone = $2,
+           grand_total = $3,
+           has_warranty = $4,
+           note = $5,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6`,
+      [customer_name, customer_phone, grand_total, has_warranty || false, note || '', id]
+    );
+
+    await client.query('DELETE FROM quote_items WHERE quote_id = $1', [id]);
+
+    for (const item of items) {
+      const productId = item.product_id || item.id;
+      await client.query(
+        `INSERT INTO quote_items (quote_id, product_id, quantity, price, total)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, productId, item.quantity, item.price, item.total]
+      );
+    }
+
+    await client.query('COMMIT');
+    return { id, ...quote };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+},
 
   delete: async (id) => {
-    await pool.query('DELETE FROM quotes WHERE id = $1', [id]);
-    return { success: true };
-  },
+  // التحقق من وجود العرض وحالته
+  const checkResult = await pool.query(
+    'SELECT status FROM quotes WHERE id = $1',
+    [id]
+  );
+
+  if (checkResult.rowCount === 0) {
+    throw new Error('عرض السعر غير موجود');
+  }
+
+  if (checkResult.rows[0].status === 'approved') {
+    throw new Error('لا يمكن حذف عرض سعر معتمد. قم بإلغاء التعميد أولاً.');
+  }
+
+  // حذف أصناف العرض أولاً إذا كانت موجودة
+  await pool.query(
+    'DELETE FROM quote_items WHERE quote_id = $1',
+    [id]
+  );
+
+  // ثم حذف العرض
+  await pool.query(
+    'DELETE FROM quotes WHERE id = $1',
+    [id]
+  );
+
+  return { success: true };
+},
+
 
   approve: async (quoteId) => {
     const client = await pool.connect();

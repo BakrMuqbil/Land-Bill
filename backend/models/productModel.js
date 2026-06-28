@@ -25,12 +25,20 @@ const productModel = {
       'UPDATE products SET name = $1, price = $2, unit = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
       [name, price, unit, id]
     );
+    if (result.rowCount === 0) {
+    throw new Error('المنتج غير موجود');
+      }
+
     return result.rows[0];
   },
 
   // حذف صنف
   delete: async (id) => {
-    await pool.query('DELETE FROM products WHERE id = $1', [id]);
+   const result = await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    if (result.rowCount === 0) {
+    throw new Error('المنتج غير موجود');
+      }
+
     return { success: true };
   },
 

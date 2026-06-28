@@ -4,6 +4,7 @@ import InvoiceOptions from './InvoiceOptions';
 
 export default function InvoiceForm({
   editingInvoiceId,
+  loading,
   invoiceNumber,        // 🔥 جديد
   customerName,
   setCustomerName,
@@ -142,15 +143,6 @@ export default function InvoiceForm({
         )}
       </form>
 
-      {/* زر إضافة صنف آخر */}
-      <button
-        type="button"
-        onClick={handleAddNewRow}
-        className="w-full py-3 mb-6 border-2 border-dashed border-emerald-300 rounded-xl text-emerald-700 bg-emerald-50/30 hover:bg-emerald-50 font-black text-xs transition-all flex items-center justify-center gap-1.5"
-      >
-        ➕ إضافة صنف آخر للفاتورة
-      </button>
-
       {/* 3. جدول بنود المحتوى المالي */}
       <InvoiceItemsTable
         currentItems={currentItems}
@@ -195,10 +187,21 @@ export default function InvoiceForm({
       <div className="flex justify-end pt-2 border-t border-slate-200/60">
           <button
             onClick={handleSaveInvoice}
-            className="w-full sm:w-auto bg-[#059669] hover:bg-emerald-700 text-white rounded-xl px-8 py-3.5 font-bold text-sm shadow-md transition-all shadow-emerald-600/10"
-          >
-            {editingInvoiceId ? 'تحديث الفاتورة ←' : 'ترحيل واعتماد الفاتورة في الحسابات ←'}
-          </button>
+            disabled={loading} // 🔥 تعطيل الزر أثناء التحميل
+      className={`w-full sm:w-auto bg-[#059669] hover:bg-emerald-700 text-white rounded-xl px-8 py-3.5 font-bold text-sm shadow-md transition-all shadow-emerald-600/10 ${
+        loading ? 'opacity-50 cursor-not-allowed' : ''
+      }`}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          جاري الحفظ...
+        </div>
+      ) : (
+        editingInvoiceId ? 'تحديث الفاتورة ←' : 'ترحيل واعتماد الفاتورة في الحسابات ←'
+      )}
+
+            </button>
         </div>
       
 

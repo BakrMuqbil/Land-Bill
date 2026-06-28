@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { printLandSolarDocument } from "../pdf/PDFGenerator.js";
 import { useApprovedQuotes } from '../../hooks/useApprovedQuotes';
+import { InvoiceService } from '../../services/invoiceService';
 import InvoiceForm from './InvoiceForm';
 import InvoiceArchive from './InvoiceArchive';
 import ApprovedQuotesSection from './ApprovedQuotesSection';
@@ -15,7 +16,7 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   const [amountPaid, setAmountPaid] = useState(0);
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState(null);
-
+const [loading, setLoading] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [customPrice, setCustomPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -25,6 +26,9 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   const [includeStamp, setIncludeStamp] = useState(false);
   const [includeNote, setIncludeNote] = useState(false);
   const [customNoteText, setCustomNoteText] = useState('');
+
+  // 🔌 خدمة الفواتير (تستخدم apiClient الذي يرفق توكن المصادقة تلقائيًا)
+  const [invoiceService] = useState(() => new InvoiceService(apiUrl));
 
   // استخدام الـ Hook للعروض المعمدة
   const {
@@ -39,11 +43,12 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   // ============================================
   const fetchInvoices = async () => {
     try {
-      const response = await fetch(`${apiUrl}/invoices`);
-      const data = await response.json();
-      setInvoices(data);
+      const data = await invoiceService.getAll();
+      setInvoices(Array.isArray(data) ? data : (data.invoices || data.data || []));
     } catch (error) {
       console.error("خطأ في جلب الفواتير:", error);
+    } finally{
+      setLoading(false);
     }
   };
 
@@ -150,13 +155,13 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   // ============================================
   const handleEditInvoice = (invoice) => {
     setEditingInvoiceId(invoice.id);
-    setCustomerName(invoice.customerName || invoice.customer_name || '');
+    setCustomerName(invoice.customerName || invoice.customerName || '');
     setCustomerPhone(invoice.customerPhone || invoice.customer_phone || '');
     setAmountPaid(invoice.amountPaid || invoice.amount_paid || 0);
-    
+
     // ✅ تصحيح: التأكد من تعيين رقم الفاتورة بشكل صحيح
-    setCurrentInvoiceNumber(invoice.invoice_number || null);
-    
+    setCurrentInvoiceNumber(invoice.invoiceNumber || null);
+
     setIncludeStamp(invoice.includeStamp || invoice.include_stamp || false);
     setIncludeNote(!!(invoice.note));
     setCustomNoteText(invoice.note || '');
@@ -176,8 +181,8 @@ export default function InvoicesManager({ products = [], apiUrl }) {
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-  
+  };
+
   const handleCancelEdit = () => {
     setEditingInvoiceId(null);
     setCustomerName('');
@@ -217,112 +222,102 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   // 6. دوال الحفظ والحذف
   // ============================================
   const handleSaveInvoice = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    setLoading(true);
 
-  const customerNameValue = customerName.trim();
-  if (!customerNameValue) {
-    alert("الرجاء إدخال اسم العميل!");
-    return;
-  }
+    const customerNameValue = customerName.trim();
+    if (!customerNameValue) {
+      alert("الرجاء إدخال اسم العميل!");
+      return;
+    }
 
-  if (currentItems.length === 0) {
-    alert("لا يمكن حفظ فاتورة فارغة! أضف أصنافاً أولاً.");
-    return;
-  }
+    if (currentItems.length === 0) {
+      alert("لا يمكن حفظ فاتورة فارغة! أضف أصنافاً أولاً.");
+      return;
+    }
 
-  const total = calculateTotal();
-  const paid = Number(amountPaid);
+    const total = calculateTotal();
+    const paid = Number(amountPaid) || 0;
 
-  if (paid > total) {
-    alert("المبلغ المدفوع لا يمكن أن يكون أكبر من إجمالي الفاتورة الكلي!");
-    return;
-  }
+    if (isNaN(paid) || paid < 0) {
+      alert("المبلغ المدفوع غير صالح!");
+      return;
+    }
 
-  const invoiceData = {
-    customerName: customerNameValue,
-    customerPhone: customerPhone.trim() || "غير مسجل",
-    grandTotal: total,
-    amountPaid: paid,
-    amountRemaining: total - paid,
-    status: getInvoiceStatus(total, paid).label,
-    includeStamp: includeStamp,
-    note: includeNote ? customNoteText : '',
-    items: currentItems.map(item => ({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      unit: item.unit,
-      quantity: item.quantity,
-      total: item.total
-    })),
-    createdAt: new Date().toISOString()
-  };
+    if (paid > total) {
+      alert("المبلغ المدفوع لا يمكن أن يكون أكبر من إجمالي الفاتورة الكلي!");
+      return;
+    }
 
-  if (currentInvoiceNumber) {
-    invoiceData.invoice_number = currentInvoiceNumber;
-  }
+    const invoiceData = {
+      customerName: customerNameValue,
+      customerPhone: customerPhone.trim() || "غير مسجل",
+      grandTotal: total,
+      amountPaid: paid,
+      amountRemaining: total - paid,
+      status: getInvoiceStatus(total, paid).label,
+      includeStamp: includeStamp,
+      note: includeNote ? customNoteText : '',
+      items: currentItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        unit: item.unit,
+        quantity: item.quantity,
+        total: item.total
+      })),
+      createdAt: new Date().toISOString()
+    };
 
-  const printPayload = {
-    ...invoiceData,
-    invoice_number: currentInvoiceNumber || null
-  };
+    if (currentInvoiceNumber) {
+      invoiceData.invoiceNumber = currentInvoiceNumber;
+    }
 
-  console.log('📤 البيانات المرسلة للحفظ:', JSON.stringify(invoiceData, null, 2));
-  console.log('🖨️ بيانات الطباعة:', JSON.stringify(printPayload, null, 2));
+    const printPayload = {
+      ...invoiceData,
+      invoiceNumber: currentInvoiceNumber || null
+    };
 
-  try {
-    let response;
-    const url = editingInvoiceId
-      ? `${apiUrl}/invoices/${editingInvoiceId}`
-      : `${apiUrl}/invoices`;
+    try {
+      const result = editingInvoiceId
+        ? await invoiceService.update(editingInvoiceId, invoiceData)
+        : await invoiceService.create(invoiceData);
 
-    const method = editingInvoiceId ? 'PUT' : 'POST';
-
-    response = await fetch(url, {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(invoiceData)
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      
-      if (result.invoice && result.invoice.invoice_number) {
-        const newInvoiceNumber = result.invoice.invoice_number;
+      if (result.invoice && result.invoice.invoiceNumber) {
+        const newInvoiceNumber = result.invoice.invoiceNumber;
         setCurrentInvoiceNumber(newInvoiceNumber);
-        printPayload.invoice_number = newInvoiceNumber;
+        printPayload.invoiceNumber = newInvoiceNumber;
       }
-      
-      printLandSolarDocument(printPayload, 'invoice');
-      
+
+      try {
+        printLandSolarDocument(printPayload, 'invoice');
+      } catch (printErr) {
+        console.error("خطأ في الطباعة:", printErr);
+      }
+
       alert(editingInvoiceId ? "تم تحديث الفاتورة بنجاح!" : "تم حفظ واعتماد الفاتورة المالية بنجاح!");
       handleCancelEdit();
       fetchInvoices();
-    } else {
-      const error = await response.json();
-      alert(`فشل الحفظ: ${error.error || 'خطأ غير معروف'}`);
+    } catch (error) {
+      console.error("خطأ في حفظ الفاتورة:", error);
+      alert(`فشل الحفظ: ${error.message || 'خطأ غير معروف'}`);
+    } finally{
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("خطأ في حفظ الفاتورة:", error);
-    alert("حدث خطأ في الاتصال بالسيرفر");
-  }
-};
-
+    
+  };
 
   const handleDeleteInvoice = async (id, name) => {
     if (confirm(`هل أنت متأكد من حذف الفاتورة المالية للعميل: "${name}" نهائياً؟`)) {
       try {
-        const response = await fetch(`${apiUrl}/invoices/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-          if (editingInvoiceId === id) {
-            handleCancelEdit();
-          }
-          fetchInvoices();
-        } else {
-          alert("فشل حذف الفاتورة");
+        await invoiceService.delete(id);
+        if (editingInvoiceId === id) {
+          handleCancelEdit();
         }
+        fetchInvoices();
       } catch (error) {
         console.error("خطأ في حذف الفاتورة:", error);
+        alert(`فشل حذف الفاتورة: ${error.message || 'خطأ غير معروف'}`);
       }
     }
   };
@@ -331,13 +326,13 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   // 7. دالة تحويل العرض المعتمد إلى فاتورة
   // ============================================
   const handleConvertApprovedQuote = async (approvedQuote) => {
-    if (!window.confirm(`هل أنت متأكد من تحويل عرض السعر "${approvedQuote.quote_number}" إلى فاتورة؟`)) {
+    if (!window.confirm(`هل أنت متأكد من تحويل عرض السعر "${approvedQuote.quoteNumber}" إلى فاتورة؟`)) {
       return;
     }
 
     try {
       const result = await convertToInvoice(approvedQuote.id, {
-        customerName: approvedQuote.customer_name,
+        customerName: approvedQuote.customerName,
         customerPhone: approvedQuote.customer_phone || '',
         grandTotal: approvedQuote.grand_total,
         amountPaid: 0,
@@ -346,7 +341,7 @@ export default function InvoicesManager({ products = [], apiUrl }) {
       });
 
       if (result.success) {
-        alert(`✅ تم تحويل العرض إلى فاتورة رقم: ${result.invoice.invoice_number}`);
+        alert(`✅ تم تحويل العرض إلى فاتورة رقم: ${result.invoice.invoiceNumber}`);
         fetchInvoices();
       } else {
         alert(`فشل التحويل: ${result.message || 'خطأ غير معروف'}`);
@@ -363,6 +358,7 @@ export default function InvoicesManager({ products = [], apiUrl }) {
   return (
     <div className="space-y-8" dir="rtl">
       <InvoiceForm
+        loading={loading}
         editingInvoiceId={editingInvoiceId}
         invoiceNumber={currentInvoiceNumber}
         customerName={customerName}

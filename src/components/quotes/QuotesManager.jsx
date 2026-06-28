@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import QuoteForm from './QuoteForm';
 import QuoteArchive from './QuoteArchive';
 import { printLandSolarDocument } from "../pdf/PDFGenerator.js";
+import { QuoteService } from '../../services/quoteService';
 
 export default function QuotesManager({ products = [], apiUrl }) {
   // ============================================
@@ -22,18 +23,21 @@ export default function QuotesManager({ products = [], apiUrl }) {
   const [includeWarranty, setIncludeWarranty] = useState(false);
   const [includeNote, setIncludeNote] = useState(false);
   const [customNoteText, setCustomNoteText] = useState('');
+const [loading, setLoading] = useState(false);
+  // 🔌 خدمة عروض الأسعار (تستخدم apiClient الذي يرفق توكن المصادقة تلقائيًا)
+  const [quoteService] = useState(() => new QuoteService(apiUrl));
 
   // ============================================
   // 2. جلب البيانات من السيرفر
   // ============================================
   const fetchQuotes = async () => {
     try {
-      const response = await fetch(`${apiUrl}/quotes`);
-      const data = await response.json();
-      setQuotes(data);
+      const data = await quoteService.getAll();
+      setQuotes(Array.isArray(data) ? data : (data.quotes || data.data || []));
     } catch (error) {
       console.error("خطأ في جلب عروض الأسعار:", error);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -111,42 +115,51 @@ export default function QuotesManager({ products = [], apiUrl }) {
   // 5. دوال التعديل على العرض
   // ============================================
   const handleEditQuoteClick = (quote) => {
-    console.log('🔄 [QuoteManager] بدء تعديل العرض:', quote);
-    
-    const targetId = quote.id || quote._id;
-    setEditingQuoteId(targetId);
-    setCustomerName(quote.customerName || quote.customer_name || '');
-    setCustomerPhone(quote.customerPhone || quote.customer_phone || '');
-    setCurrentQuoteNumber(quote.quote_number || null);
+  console.log('🔄 [QuoteManager] بدء تعديل العرض:', quote);
 
-    setIncludeWarranty(quote.hasWarranty || quote.has_warranty || false);
-    setIncludeNote(!!(quote.note));
-    setCustomNoteText(quote.note || '');
+  // ❌ منع تعديل العرض إذا كان معتمد
+  if (quote.status === 'approved') {
+    alert('⚠️ لا يمكن تعديل عرض سعر معتمد. قم بإلغاء التعميد أولاً.');
+    return;
+  }
 
-    if (quote.items && Array.isArray(quote.items) && quote.items.length > 0) {
-      const formattedItems = quote.items.map((item, index) => {
-        const productId = item.product_id || item.id;
-        const foundProd = products.find(p => p.id === productId);
-        
-        return {
-          rowId: Date.now() + index,
-          productId: foundProd ? foundProd.id.toString() : '',
-          customPrice: item.price || 0,
-          quantity: item.quantity || 1
-        };
-      });
-      setCurrentItems(formattedItems);
-    } else {
-      setCurrentItems([{ 
-        rowId: Date.now(), 
-        productId: '', 
-        customPrice: '', 
-        quantity: 1 
-      }]);
-    }
+  const targetId = quote.id || quote._id;
+  setEditingQuoteId(targetId);
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  setCustomerName(quote.customerName || quote.customerName || '');
+  setCustomerPhone(quote.customerPhone || quote.customer_phone || '');
+  setCurrentQuoteNumber(quote.quoteNumber || null);
+
+  setIncludeWarranty(quote.hasWarranty || quote.has_warranty || false);
+  setIncludeNote(!!(quote.note));
+  setCustomNoteText(quote.note || '');
+
+  if (quote.items && Array.isArray(quote.items) && quote.items.length > 0) {
+    const formattedItems = quote.items.map((item, index) => {
+      const productId = item.product_id || item.id;
+      const foundProd = products.find(p => p.id === productId);
+
+      return {
+        rowId: Date.now() + index,
+        productId: foundProd ? foundProd.id.toString() : '',
+        customPrice: item.price || 0,
+        quantity: item.quantity || 1
+      };
+    });
+
+    setCurrentItems(formattedItems);
+  } else {
+    setCurrentItems([{
+      rowId: Date.now(),
+      productId: '',
+      customPrice: '',
+      quantity: 1
+    }]);
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+  
 
   const handleCancelEdit = () => {
     setEditingQuoteId(null);
@@ -160,10 +173,11 @@ export default function QuotesManager({ products = [], apiUrl }) {
   };
 
   // ============================================
-  // 6. دوال الحفظ والحذف (المصححة)
+  // 6. دوال الحفظ والحذف
   // ============================================
   const handleSubmitQuote = async (e) => {
     e.preventDefault();
+    setLoading(true)
 
     if (!customerName.trim()) {
       alert("الرجاء إدخال اسم العميل");
@@ -216,74 +230,73 @@ export default function QuotesManager({ products = [], apiUrl }) {
     };
 
     if (currentQuoteNumber) {
-      quotePayload.quote_number = currentQuoteNumber;
+      quotePayload.quoteNumber = currentQuoteNumber;
     }
 
-    console.log('📤 البيانات المرسلة:', JSON.stringify(quotePayload, null, 2));
-
     try {
-      let response;
-      if (editingQuoteId) {
-        response = await fetch(`${apiUrl}/quotes/${editingQuoteId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(quotePayload)
-        });
-      } else {
-        response = await fetch(`${apiUrl}/quotes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(quotePayload)
-        });
+      const responseData = editingQuoteId
+        ? await quoteService.update(editingQuoteId, quotePayload)
+        : await quoteService.create(quotePayload);
+
+      console.log("========== RESPONSE ==========");
+console.log(responseData);
+console.log(JSON.stringify(responseData, null, 2));
+console.log("==============================");
+
+
+      // ✅ تحديث رقم العرض من استجابة السيرفر
+      if (responseData.quote && responseData.quote.quoteNumber) {
+        const newQuoteNumber = responseData.quote.quoteNumber;
+        setCurrentQuoteNumber(newQuoteNumber);
+        quotePayload.quoteNumber = newQuoteNumber;
       }
 
-      const responseData = await response.json();
-      console.log('📥 الرد من السيرفر:', responseData);
-
-      if (response.ok) {
-        // ✅ تحديث رقم العرض من استجابة السيرفر
-        if (responseData.quote && responseData.quote.quote_number) {
-          const newQuoteNumber = responseData.quote.quote_number;
-          setCurrentQuoteNumber(newQuoteNumber);
-          quotePayload.quote_number = newQuoteNumber;
-        }
-        
-        // ✅ طباعة الـ PDF بعد تحديث رقم العرض
+      // ✅ طباعة الـ PDF بعد تحديث رقم العرض
+      try {
         printLandSolarDocument(quotePayload, 'offer');
-        handleCancelEdit();
-        fetchQuotes();
-        
-        // ✅ إظهار رسالة نجاح مع رقم العرض
-        alert(`✅ تم حفظ عرض السعر بنجاح! رقم العرض: ${quotePayload.quote_number || 'غير معروف'}`);
-      } else {
-        alert(`فشلت عملية الحفظ: ${responseData.error || response.status}`);
+      } catch (printErr) {
+        console.error("خطأ في الطباعة:", printErr);
       }
+
+      handleCancelEdit();
+      fetchQuotes();
+
+      // ✅ إظهار رسالة نجاح مع رقم العرض
+      alert(`✅ تم حفظ عرض السعر بنجاح! رقم العرض: ${quotePayload.quoteNumber || 'غير معروف'}`);
     } catch (error) {
       console.error("خطأ أثناء حفظ عرض السعر:", error);
-      alert("حدث خطأ في الاتصال بالسيرفر: " + error.message);
+      alert(`فشلت عملية الحفظ: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
-  const handleDeleteQuote = async (id, name) => {
-    if (!window.confirm(`هل أنت متأكد من حذف عرض السعر الخاص بالعميل (${name})؟`)) {
-      return;
+  const handleDeleteQuote = async (id, name, status) => {
+  // ❌ منع حذف عرض سعر معتمد
+  if (status === 'approved') {
+    alert('⚠️ لا يمكن حذف عرض سعر معتمد.\nيجب أولاً إلغاء التعميد ثم الحذف.');
+    return;
+  }
+
+  if (!window.confirm(`هل أنت متأكد من حذف عرض السعر الخاص بالعميل (${name})؟`)) {
+    return;
+  }
+
+  try {
+    await quoteService.delete(id);
+
+    fetchQuotes();
+
+    if (editingQuoteId === id) {
+      handleCancelEdit();
     }
-    try {
-      const response = await fetch(`${apiUrl}/quotes/${id}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        fetchQuotes();
-        if (editingQuoteId === id) {
-          handleCancelEdit();
-        }
-      } else {
-        alert("فشل حذف العرض من الخادم");
-      }
-    } catch (error) {
-      console.error("خطأ أثناء حذف عرض السعر:", error);
+
+  } catch (error) {
+    console.error("خطأ أثناء حذف عرض السعر:", error);
+    alert(`فشل حذف العرض من الخادم: ${error.message || 'خطأ غير معروف'}`);
+  }
+    finally{
+      setLoading(false)
     }
-  };
+};
 
   // ============================================
   // 7. دوال التعميد
@@ -293,19 +306,12 @@ export default function QuotesManager({ products = [], apiUrl }) {
       return;
     }
     try {
-      const response = await fetch(`${apiUrl}/quotes/${id}/approve`, {
-        method: 'PUT'
-      });
-      if (response.ok) {
-        alert('✅ تم تعميد عرض السعر بنجاح!');
-        fetchQuotes();
-      } else {
-        const error = await response.json();
-        alert(`فشل التعميد: ${error.error || 'خطأ غير معروف'}`);
-      }
+      await quoteService.approve(id);
+      alert('✅ تم تعميد عرض السعر بنجاح!');
+      fetchQuotes();
     } catch (error) {
       console.error("خطأ أثناء تعميد العرض:", error);
-      alert("حدث خطأ في الاتصال بالسيرفر");
+      alert(`فشل التعميد: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -314,19 +320,12 @@ export default function QuotesManager({ products = [], apiUrl }) {
       return;
     }
     try {
-      const response = await fetch(`${apiUrl}/quotes/${id}/unapprove`, {
-        method: 'PUT'
-      });
-      if (response.ok) {
-        alert('✅ تم إلغاء تعميد عرض السعر بنجاح!');
-        fetchQuotes();
-      } else {
-        const error = await response.json();
-        alert(`فشل إلغاء التعميد: ${error.error || 'خطأ غير معروف'}`);
-      }
+      await quoteService.unapprove(id);
+      alert('✅ تم إلغاء تعميد عرض السعر بنجاح!');
+      fetchQuotes();
     } catch (error) {
       console.error("خطأ أثناء إلغاء تعميد العرض:", error);
-      alert("حدث خطأ في الاتصال بالسيرفر");
+      alert(`فشل إلغاء التعميد: ${error.message || 'خطأ غير معروف'}`);
     }
   };
 
@@ -334,8 +333,9 @@ export default function QuotesManager({ products = [], apiUrl }) {
   // 8. الـ Return
   // ============================================
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 md:p-6" dir="rtl">
+    <div className="space-y-8" dir="rtl">
       <QuoteForm
+        loading={loading}
         editingQuoteId={editingQuoteId}
         quoteNumber={currentQuoteNumber}
         customerName={customerName}

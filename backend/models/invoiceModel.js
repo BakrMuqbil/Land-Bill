@@ -27,18 +27,18 @@ const invoiceModel = {
     return result.rows;
   },
 
+  // ✅ استخدام snake_case فقط
   create: async (invoice) => {
-    const { customerName, customerPhone, grandTotal, amountPaid, amountRemaining, status, includeStamp, note, items } = invoice;
+    const { customer_name, customer_phone, grand_total, amount_paid, amount_remaining, status, include_stamp, note, items } = invoice;
     const client = await pool.connect();
     
     try {
       await client.query('BEGIN');
 
-      // 🔥 إضافة include_stamp و note إلى INSERT
       const invoiceResult = await client.query(
         `INSERT INTO invoices (customer_name, customer_phone, grand_total, amount_paid, amount_remaining, status, include_stamp, note) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [customerName, customerPhone, grandTotal, amountPaid || 0, amountRemaining || 0, status || 'غير مدفوعة', includeStamp || false, note || '']
+        [customer_name, customer_phone, grand_total, amount_paid || 0, amount_remaining || 0, status || 'غير مدفوعة', include_stamp || false, note || '']
       );
       
       const invoiceId = invoiceResult.rows[0].id;
@@ -62,15 +62,15 @@ const invoiceModel = {
     }
   },
 
+  // ✅ استخدام snake_case فقط مع rowCount
   update: async (id, invoice) => {
-    const { customerName, customerPhone, grandTotal, amountPaid, amountRemaining, status, includeStamp, note, items } = invoice;
+    const { customer_name, customer_phone, grand_total, amount_paid, amount_remaining, status, include_stamp, note, items } = invoice;
     const client = await pool.connect();
     
     try {
       await client.query('BEGIN');
 
-      // 🔥 إضافة include_stamp و note إلى UPDATE
-      await client.query(
+      const result = await client.query(
         `UPDATE invoices 
          SET customer_name = $1, 
              customer_phone = $2, 
@@ -81,9 +81,13 @@ const invoiceModel = {
              include_stamp = $7,
              note = $8,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $9`,
-        [customerName, customerPhone, grandTotal, amountPaid || 0, amountRemaining || 0, status || 'غير مدفوعة', includeStamp || false, note || '', id]
+         WHERE id = $9 RETURNING *`,
+        [customer_name, customer_phone, grand_total, amount_paid || 0, amount_remaining || 0, status || 'غير مدفوعة', include_stamp || false, note || '', id]
       );
+
+      if (result.rowCount === 0) {
+        throw new Error('الفاتورة غير موجودة');
+      }
 
       await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [id]);
 
@@ -106,7 +110,10 @@ const invoiceModel = {
   },
 
   delete: async (id) => {
-    await pool.query('DELETE FROM invoices WHERE id = $1', [id]);
+    const result = await pool.query('DELETE FROM invoices WHERE id = $1', [id]);
+    if (result.rowCount === 0) {
+      throw new Error('الفاتورة غير موجودة');
+    }
     return { success: true };
   },
 
@@ -115,6 +122,9 @@ const invoiceModel = {
       'UPDATE invoices SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
       [status, id]
     );
+    if (result.rowCount === 0) {
+      throw new Error('الفاتورة غير موجودة');
+    }
     return result.rows[0];
   }
 };

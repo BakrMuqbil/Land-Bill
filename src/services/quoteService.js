@@ -18,6 +18,15 @@ export class QuoteService extends ApiClient {
   }
 
   async delete(id) {
-    return this.delete(`/quotes/${id}`);
+    // ⚠️ super.delete() وليس this.delete() لتجنب الاستدعاء المتكرر اللانهائي
+    return super.delete(`/quotes/${id}`);
+  }
+
+  async approve(id) {
+    return this.put(`/quotes/${id}/approve`);
+  }
+
+  async unapprove(id) {
+    return this.put(`/quotes/${id}/unapprove`);
   }
 }

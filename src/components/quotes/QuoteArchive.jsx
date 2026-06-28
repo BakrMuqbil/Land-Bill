@@ -26,7 +26,7 @@ export default function QuoteArchive({
       // جلب البيانات مع دعم camelCase و snake_case
       const customerName = (q.customerName || q.customer_name || '').toLowerCase();
       const customerPhone = (q.customerPhone || q.customer_phone || '').toLowerCase();
-      const quoteNumber = (q.quote_number || '').toLowerCase();
+      const quoteNumber = (q.quoteNumber || '').toLowerCase();
       const grandTotal = String(q.grandTotal || q.grand_total || '');
       const status = (q.status || '').toLowerCase();
       const note = (q.note || '').toLowerCase();
@@ -130,7 +130,7 @@ export default function QuoteArchive({
                   const note = q.note || '';
                   const status = q.status || 'pending';
                   const createdAt = q.createdAt || q.created_at;
-                  const quoteNumber = q.quote_number || '—';
+                  const quoteNumber = q.quoteNumber || '—';
                   const isApproved = status === 'approved';
 
                   return (
@@ -220,7 +220,7 @@ export default function QuoteArchive({
                           )}
                           <button
                             type="button"
-                            onClick={() => onDelete(currentQuoteId, customerName)}
+                            onClick={() => onDelete(currentQuoteId, customerName, status)}
                             className="p-2 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
                             title="حذف"
                           >
@@ -248,7 +248,7 @@ export default function QuoteArchive({
               const note = q.note || '';
               const status = q.status || 'pending';
               const createdAt = q.createdAt || q.created_at;
-              const quoteNumber = q.quote_number || '—';
+              const quoteNumber = q.quoteNumber || '—';
               const isApproved = status === 'approved';
 
               return (
@@ -348,7 +348,7 @@ export default function QuoteArchive({
                       )}
                       <button
                         type="button"
-                        onClick={() => onDelete(currentQuoteId, customerName)}
+                        onClick={() => onDelete(currentQuoteId, customerName,status)}
                         className="flex-1 min-w-[40px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1"
                       >
                         🗑️ حذف

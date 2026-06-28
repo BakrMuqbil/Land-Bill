@@ -35,7 +35,7 @@ export default function ApprovedQuotesSection({
               // 🔥 دعم كل من snake_case و camelCase
               const customerName = q.customer_name || q.customerName || '—';
               const grandTotal = q.grand_total || q.grandTotal || 0;
-              const quoteNumber = q.quote_number || '—';
+              const quoteNumber = q.quoteNumber || '—';
               const approvedAt = q.approved_at || q.approvedAt;
 
               return (

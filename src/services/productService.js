@@ -18,6 +18,7 @@ export class ProductService extends ApiClient {
   }
 
   async delete(id) {
-    return this.delete(`/products/${id}`);
+    // ⚠️ super.delete() وليس this.delete() لتجنب الاستدعاء المتكرر اللانهائي
+    return super.delete(`/products/${id}`);
   }
 }

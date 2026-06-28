@@ -7,6 +7,9 @@ const productModel = require('./models/productModel');
 const quoteModel = require('./models/quoteModel');
 const invoiceModel = require('./models/invoiceModel');
 const authService = require('./services/authService');
+const { validateInvoicePayload } = require('./validators/invoiceValidator');
+// ✅ إضافة caseConverter
+const { toSnakeCase, toCamelCase, toCamelCaseArray } = require('./utils/caseConverter');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,15 +21,12 @@ app.use(bodyParser.json());
 // 🔐 مسارات المصادقة (Authentication)
 // ============================================
 
-// ✅ تسجيل الدخول
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-
     if (!username || !password) {
       return res.status(400).json({ error: 'اسم المستخدم وكلمة المرور مطلوبة' });
     }
-
     const result = await authService.login(username, password);
     res.json({ success: true, ...result });
   } catch (error) {
@@ -34,31 +34,19 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ✅ التحقق من صحة التوكن
 app.get('/api/auth/verify', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ valid: false });
-  }
-
+  if (!token) return res.status(401).json({ valid: false });
   const result = authService.verifyToken(token);
   res.json(result);
 });
 
-// ✅ تغيير كلمة المرور
 app.put('/api/auth/change-password', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'غير مصرح' });
-    }
-
+    if (!token) return res.status(401).json({ error: 'غير مصرح' });
     const { valid, user } = authService.verifyToken(token);
-    if (!valid) {
-      return res.status(401).json({ error: 'جلسة غير صالحة' });
-    }
-
+    if (!valid) return res.status(401).json({ error: 'جلسة غير صالحة' });
     const { oldPassword, newPassword } = req.body;
     await authService.changePassword(user.id, oldPassword, newPassword);
     res.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
@@ -67,7 +55,6 @@ app.put('/api/auth/change-password', async (req, res) => {
   }
 });
 
-// ✅ إضافة مستخدم جديد (للمطورين فقط)
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password, fullName, role } = req.body;
@@ -84,7 +71,7 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const products = await productModel.getAll();
-    res.json(products);
+    res.json(toCamelCaseArray(products)); // ✅ snake_case → camelCase
   } catch (error) {
     console.error('❌ خطأ في جلب الأصناف:', error);
     res.status(500).json({ error: error.message });
@@ -93,8 +80,9 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const product = await productModel.create(req.body);
-    res.json({ success: true, product });
+    const snakeData = toSnakeCase(req.body); // ✅ camelCase → snake_case
+    const product = await productModel.create(snakeData);
+    res.json({ success: true, product: toCamelCase(product) });
   } catch (error) {
     console.error('❌ خطأ في إضافة صنف:', error);
     res.status(500).json({ error: error.message });
@@ -103,8 +91,10 @@ app.post('/api/products', async (req, res) => {
 
 app.put('/api/products/:id', async (req, res) => {
   try {
-    const product = await productModel.update(parseInt(req.params.id), req.body);
-    res.json({ success: true, product });
+    const id = parseInt(req.params.id);
+    const snakeData = toSnakeCase(req.body);
+    const product = await productModel.update(id, snakeData);
+    res.json({ success: true, product: toCamelCase(product) });
   } catch (error) {
     console.error('❌ خطأ في تحديث صنف:', error);
     res.status(500).json({ error: error.message });
@@ -113,7 +103,8 @@ app.put('/api/products/:id', async (req, res) => {
 
 app.delete('/api/products/:id', async (req, res) => {
   try {
-    await productModel.delete(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    await productModel.delete(id);
     res.json({ success: true });
   } catch (error) {
     console.error('❌ خطأ في حذف صنف:', error);
@@ -127,7 +118,7 @@ app.delete('/api/products/:id', async (req, res) => {
 app.get('/api/quotes', async (req, res) => {
   try {
     const quotes = await quoteModel.getAll();
-    res.json(quotes);
+    res.json(toCamelCaseArray(quotes)); // ✅ snake_case → camelCase
   } catch (error) {
     console.error('❌ خطأ في جلب عروض الأسعار:', error);
     res.status(500).json({ error: error.message });
@@ -135,25 +126,23 @@ app.get('/api/quotes', async (req, res) => {
 });
 
 app.post('/api/quotes', async (req, res) => {
-  console.log('📥 [server] POST /api/quotes - البيانات:', JSON.stringify(req.body, null, 2));
   try {
-    const quote = await quoteModel.create(req.body);
+    const snakeData = toSnakeCase(req.body); // ✅ camelCase → snake_case
+    const quote = await quoteModel.create(snakeData);
     console.log('✅ [server] تم حفظ العرض بنجاح:', quote);
-    res.json({ success: true, quote });
+    res.json({ success: true, quote: toCamelCase(quote) });
   } catch (error) {
     console.error('❌ [server] خطأ في حفظ عرض السعر:', error.message);
-    console.error('❌ [server] Stack:', error.stack);
-    res.status(500).json({ 
-      error: error.message,
-      stack: error.stack 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.put('/api/quotes/:id', async (req, res) => {
   try {
-    const quote = await quoteModel.update(parseInt(req.params.id), req.body);
-    res.json({ success: true, quote });
+    const id = parseInt(req.params.id);
+    const snakeData = toSnakeCase(req.body);
+    const quote = await quoteModel.update(id, snakeData);
+    res.json({ success: true, quote: toCamelCase(quote) });
   } catch (error) {
     console.error('❌ خطأ في تحديث عرض سعر:', error);
     res.status(500).json({ error: error.message });
@@ -162,7 +151,8 @@ app.put('/api/quotes/:id', async (req, res) => {
 
 app.delete('/api/quotes/:id', async (req, res) => {
   try {
-    await quoteModel.delete(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    await quoteModel.delete(id);
     res.json({ success: true });
   } catch (error) {
     console.error('❌ خطأ في حذف عرض سعر:', error);
@@ -174,7 +164,6 @@ app.delete('/api/quotes/:id', async (req, res) => {
 // مسارات التعميد (Approval)
 // ============================================
 
-// تعميد عرض سعر
 app.put('/api/quotes/:id/approve', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -186,7 +175,6 @@ app.put('/api/quotes/:id/approve', async (req, res) => {
   }
 });
 
-// إلغاء تعميد عرض سعر
 app.put('/api/quotes/:id/unapprove', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -198,22 +186,21 @@ app.put('/api/quotes/:id/unapprove', async (req, res) => {
   }
 });
 
-// جلب عروض الأسعار المعمدة
 app.get('/api/approved-quotes', async (req, res) => {
   try {
     const approvedQuotes = await quoteModel.getApprovedQuotes();
-    res.json(approvedQuotes);
+    res.json(toCamelCaseArray(approvedQuotes)); // ✅ snake_case → camelCase
   } catch (error) {
     console.error('❌ خطأ في جلب العروض المعمدة:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// تحويل عرض معتمد إلى فاتورة
 app.post('/api/approved-quotes/:id/convert', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const result = await quoteModel.convertToInvoice(id, req.body);
+    const snakeData = toSnakeCase(req.body);
+    const result = await quoteModel.convertToInvoice(id, snakeData);
     res.json(result);
   } catch (error) {
     console.error('❌ خطأ في تحويل عرض إلى فاتورة:', error);
@@ -227,7 +214,7 @@ app.post('/api/approved-quotes/:id/convert', async (req, res) => {
 app.get('/api/invoices', async (req, res) => {
   try {
     const invoices = await invoiceModel.getAll();
-    res.json(invoices);
+    res.json(toCamelCaseArray(invoices)); // ✅ snake_case → camelCase
   } catch (error) {
     console.error('❌ خطأ في جلب الفواتير:', error);
     res.status(500).json({ error: error.message });
@@ -236,8 +223,14 @@ app.get('/api/invoices', async (req, res) => {
 
 app.post('/api/invoices', async (req, res) => {
   try {
-    const invoice = await invoiceModel.create(req.body);
-    res.json({ success: true, invoice });
+    const errors = validateInvoicePayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ error: errors.join('، ') });
+    }
+
+    const snakeData = toSnakeCase(req.body); // ✅ camelCase → snake_case
+    const invoice = await invoiceModel.create(snakeData);
+    res.json({ success: true, invoice: toCamelCase(invoice) });
   } catch (error) {
     console.error('❌ خطأ في إضافة فاتورة:', error);
     res.status(500).json({ error: error.message });
@@ -246,8 +239,15 @@ app.post('/api/invoices', async (req, res) => {
 
 app.put('/api/invoices/:id', async (req, res) => {
   try {
-    const invoice = await invoiceModel.update(parseInt(req.params.id), req.body);
-    res.json({ success: true, invoice });
+    const errors = validateInvoicePayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ error: errors.join('، ') });
+    }
+
+    const id = parseInt(req.params.id);
+    const snakeData = toSnakeCase(req.body);
+    const invoice = await invoiceModel.update(id, snakeData);
+    res.json({ success: true, invoice: toCamelCase(invoice) });
   } catch (error) {
     console.error('❌ خطأ في تحديث فاتورة:', error);
     res.status(500).json({ error: error.message });
@@ -256,7 +256,8 @@ app.put('/api/invoices/:id', async (req, res) => {
 
 app.delete('/api/invoices/:id', async (req, res) => {
   try {
-    await invoiceModel.delete(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    await invoiceModel.delete(id);
     res.json({ success: true });
   } catch (error) {
     console.error('❌ خطأ في حذف فاتورة:', error);
