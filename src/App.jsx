@@ -8,8 +8,8 @@ import InvoicesManager from './components/InvoicesManager';
 import ProductsManager from './components/ProductsManager';
 import { ProductService } from './services/productService';
 
-const API_URL = 'http://localhost:5000/api';
-
+//const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 // ============================================
 // 🔥 مكون المحتوى الرئيسي (محمي)
 // ============================================
