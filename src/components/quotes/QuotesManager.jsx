@@ -238,11 +238,7 @@ const [loading, setLoading] = useState(false);
         ? await quoteService.update(editingQuoteId, quotePayload)
         : await quoteService.create(quotePayload);
 
-      console.log("========== RESPONSE ==========");
-console.log(responseData);
-console.log(JSON.stringify(responseData, null, 2));
-console.log("==============================");
-
+      
 
       // ✅ تحديث رقم العرض من استجابة السيرفر
       if (responseData.quote && responseData.quote.quoteNumber) {

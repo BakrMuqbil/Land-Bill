@@ -65,7 +65,6 @@ const getInvoiceStyle = () => `
     flex-direction: column;
   }
 
-  /* 🔥 هيدر: رقم في اليسار، عنوان في المنتصف (RTL) */
   .header-section {
     display: flex;
     justify-content: space-between;
@@ -204,7 +203,7 @@ const getInvoiceStyle = () => `
 `;
 
 /**
- * الدالة الموحدة لإنشاء المستند وطباعته
+ * الدالة الموحدة لإنشاء المستند وطباعته - باستخدام نافذة جديدة
  */
 export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   const isOffer = mode === 'offer';
@@ -218,8 +217,8 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
   const hasWarranty = data.hasWarranty || data.has_warranty || false;
   const includeStamp = data.includeStamp || data.include_stamp || false;
 
-  // 🔥 رقم المستند (فاتورة أو عرض سعر)
-  const documentNumber = data.invoiceNumber || data.quoteNumber || data.documentNumber || '';
+  // رقم المستند (فاتورة أو عرض سعر)
+  const documentNumber = data.invoiceNumber || data.invoice_number || data.quoteNumber || data.quote_number || data.documentNumber || '';
 
   const documentDate = getCurrentFormattedDate();
 
@@ -254,43 +253,24 @@ export const printLandSolarDocument = (data = {}, mode = 'offer') => {
     `;
   }
 
-  // إدارة الـ iframe المخفي
-  let printFrame = document.getElementById('land-solar-print-frame');
-  if (printFrame) {
-    printFrame.remove();
-  }
+  // بناء اسم الملف
+  const cleanCustomerName = customerName.replace(/[^a-zA-Z0-9\u0600-\u06FF\s]/g, '').trim() || 'غير معروف';
+  const docType = isOffer ? 'عرض سعر' : 'فاتورة';
+  const fileName = `${docType} - ${cleanCustomerName}`;
 
-  printFrame = document.createElement('iframe');
-  printFrame.id = 'land-solar-print-frame';
-  printFrame.style.position = 'fixed';
-  printFrame.style.bottom = '0';
-  printFrame.style.right = '0';
-  printFrame.style.width = '1px';
-  printFrame.style.height = '1px';
-  printFrame.style.border = 'none';
-  printFrame.style.visibility = 'hidden';
-  document.body.appendChild(printFrame);
+  const grandTotal = data.grandTotal ?? data.grand_total ?? 0;
+  const amountPaid = data.amountPaid ?? data.amount_paid ?? 0;
+  const amountRemaining = data.amountRemaining ?? data.amount_remaining ?? 0;
 
-  const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
-  
-  const grandTotal =
-  data.grandTotal ?? data.grand_total ?? 0;
-
-const amountPaid =
-  data.amountPaid ?? data.amount_paid ?? 0;
-
-const amountRemaining =
-  data.amountRemaining ?? data.amount_remaining ?? 0;
-
-  // 🔥 تحديد النص المعروض حسب نوع المستند
   const docLabel = isOffer ? 'رقم العرض' : 'رقم الفاتورة';
 
-  frameDoc.open();
-  frameDoc.write(`
+  // بناء HTML كامل للطباعة
+  const printContent = `
     <!DOCTYPE html>
     <html dir="rtl">
     <head>
-      <title>${isOffer ? 'عرض سعر' : 'فاتورة'} - ${customerName}</title>
+      <meta charset="UTF-8">
+      <title>${fileName}</title>
       <style>${getInvoiceStyle()}</style>
     </head>
     <body>
@@ -299,9 +279,9 @@ const amountRemaining =
       
       <div class="main-content">
         
-        <!-- 🔥 هيدر: رقم في اليسار، عنوان في المنتصف -->
-        <div class="header-section" >
-          <div class="header-left" >
+        <!-- هيدر: رقم في اليسار، عنوان في المنتصف -->
+        <div class="header-section">
+          <div class="header-left">
             ${documentNumber ? `<span class="doc-label">${docLabel}: </span><span class="doc-number">${documentNumber}</span>` : ''}
           </div>
           <div class="header-center">
@@ -380,25 +360,29 @@ const amountRemaining =
       </div>
     </body>
     </html>
-  `);
-  frameDoc.close();
+  `;
 
-  const executePrint = () => {
-    setTimeout(() => {
-      try {
-        printFrame.contentWindow.focus();
-        printFrame.contentWindow.print();
-      } catch (e) {
-        console.error("فشلت عملية استدعاء واجهة الطباعة:", e);
-      }
-    }, 600);
-  };
-
-  if (frameDoc.readyState === 'complete') {
-    executePrint();
-  } else {
-    printFrame.onload = executePrint;
+  // 🔥 فتح نافذة جديدة للطباعة
+  const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+  
+  if (!printWindow) {
+    alert('⚠️ الرجاء السماح للنوافذ المنبثقة لطباعة المستند');
+    return;
   }
+
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+
+  // 🔥 تغيير عنوان النافذة ليكون اسم الملف المطلوب
+  printWindow.document.title = fileName;
+
+  // الانتظار حتى تحميل المحتوى بالكامل ثم الطباعة
+  printWindow.onload = function() {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
+  };
 };
 
 export default { printLandSolarDocument };
