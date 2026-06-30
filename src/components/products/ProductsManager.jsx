@@ -41,6 +41,7 @@ export default function ProductsManager({ products = [], onSave, onDelete }) {
       unit: product.unit || 'حبة'
     });
     setIsEditing(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteClick = (id, name) => {
